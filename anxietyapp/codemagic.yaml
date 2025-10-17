@@ -1,0 +1,173 @@
+workflows:
+  react-native-android:
+    name: React Native Android
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      android_signing:
+        - app_ref
+      groups:
+        - google_credentials
+        - app_dot_env
+      vars:
+        PACKAGE_NAME: "com.anxietyapporg.anxietyapp"
+      node: 20.19.0
+#    triggering:
+#      events:
+#        - push
+#        - tag
+#        - pull_request
+#      branch_patterns:
+#        - pattern: main  # Build only on main for cost savings
+#          include: true
+#          source: true
+    scripts:
+      - name: Install dependencies and generate native projects
+        script: |
+          yarn install
+          npx expo prebuild
+      - name: Android Build-tools
+        script: |
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34"
+      - name: Set Android SDK location
+        script: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/android/local.properties"
+      - name: Install Gradle (if needed)
+        script: |
+          wget https://services.gradle.org/distributions/gradle-8.0-bin.zip -P /tmp
+          unzip -d /tmp /tmp/gradle-8.0-bin.zip
+          export GRADLE_HOME=/tmp/gradle-8.0
+          export PATH=$PATH:$GRADLE_HOME/bin
+      - name: Modify build.gradle for signing configuration
+        script: |
+          sed -i '' '
+            /signingConfigs {/,/}/c\
+            signingConfigs {\
+                debug {\
+                    storeFile file("debug.keystore")\
+                    storePassword "android"\
+                    keyAlias "androiddebugkey"\
+                    keyPassword "android"\
+                }\
+                release {\
+                    storeFile file(System.getenv()["CM_KEYSTORE_PATH"])\
+                    storePassword System.getenv("CM_KEYSTORE_PASSWORD")\
+                    keyAlias System.getenv("CM_KEY_ALIAS")\
+                    keyPassword System.getenv("CM_KEY_PASSWORD")\
+                }\
+          ' $CM_BUILD_DIR/android/app/build.gradle
+          sed -i '' '
+                s|signingConfig signingConfigs.debug|signingConfig signingConfigs.release|g
+              ' $CM_BUILD_DIR/android/app/build.gradle
+          sed -i '' '
+                s|versionCode 1|versionCode project.hasProperty("versionCode") ? project.versionCode.toInteger() : 1|g
+                s|versionName "1.0.0"|versionName project.hasProperty("versionName") ? project.versionName : "1.0.0"|g
+              ' $CM_BUILD_DIR/android/app/build.gradle
+      - name: Read version from app.json + Build Android release
+        script: |
+          export APP_VERSION=$(jq -r '.expo.version' app.json)
+          export APP_BUILD_NUMBER=$(jq -r '.expo.android.versionCode' app.json)
+          echo "📦 App version: $APP_VERSION"
+          echo "🔢 Build number: $APP_BUILD_NUMBER"
+          cd android
+          ./gradlew clean 
+          ./gradlew bundleRelease \
+            -PversionCode=$APP_BUILD_NUMBER \
+            -PversionName=$APP_VERSION
+
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+    publishing:
+      email:
+        recipients:
+          - user_1@example.com
+          - user_2@example.com
+        notify:
+          success: true
+          failure: false
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: alpha
+        submit_as_draft: false
+
+  react-native-ios:
+    name: React Native iOS
+    max_build_duration: 120
+    instance_type: mac_mini_m2  # Ideal for iOS builds
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      groups:
+        - app_dot_env
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: "com.anxietyapporg.anxietyapp"
+      vars:
+        XCODE_WORKSPACE: "Rescue.xcworkspace" # <-- Put the name of your Xcode workspace here
+        XCODE_SCHEME: "Rescue" # <-- Put the name of your Xcode scheme here
+        BUNDLE_ID: "com.anxietyapporg.anxietyapp" # <-- Put your Bundle Id here e.g com.domain.myapp
+        APP_ID: 6473524067 # <-- Put the app id number here. This is found in App Store Connect > App > General > App Information
+      node: 20.19.0
+      xcode: 16.0
+      cocoapods: default
+#    triggering:
+#      events:
+#        - push
+#        - tag
+#        - pull_request
+#      branch_patterns:
+#        - pattern: main  # Build only on main for cost savings
+#          include: true
+#          source: true
+    scripts:
+      - name: Install dependencies and generate native projects
+        script: |
+          yarn install
+          npx expo prebuild
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles --warn-only
+      - name: Set Info.plist values (+version from app.json)
+        script: |
+          APP_VERSION=$(jq -r '.expo.version' app.json)
+          APP_BUILD_NUMBER=$(jq -r '.expo.ios.buildNumber' app.json)
+          echo "📦 App version: $APP_VERSION"
+          echo "🔢 Build number: $APP_BUILD_NUMBER"
+          PLIST=$CM_BUILD_DIR/ios/$XCODE_SCHEME/Info.plist
+          PLIST_BUDDY=/usr/libexec/PlistBuddy
+          $PLIST_BUDDY -c "Add :ITSAppUsesNonExemptEncryption bool false" $PLIST
+          $PLIST_BUDDY -c "Set :CFBundleShortVersionString $APP_VERSION" $PLIST
+          $PLIST_BUDDY -c "Set :CFBundleVersion $(($APP_BUILD_NUMBER))" $PLIST
+          $PLIST_BUDDY -c "Delete UIDeviceFamily" $PLIST
+          $PLIST_BUDDY -c "Add UIDeviceFamily array" $PLIST
+          $PLIST_BUDDY -c "Add UIDeviceFamily:0 integer 1" $PLIST
+          $PLIST_BUDDY -c "Add UIDeviceFamily:1 integer 2" $PLIST
+          plutil -p "$CM_BUILD_DIR/ios/$XCODE_SCHEME/Info.plist"
+      - name: Build ios
+        script: |
+          xcode-project build-ipa \
+            --workspace "$CM_BUILD_DIR/ios/$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      email:
+        recipients:
+          - user_1@example.com
+          - user_2@example.com
+        notify:
+          success: true
+          failure: false
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - group name 1
+          - group name 2
+        submit_to_app_store: false

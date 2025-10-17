@@ -1,0 +1,5 @@
+# Install EAS CLI
+npm install --global eas-cli
+
+# upload to EAS
+eas build --platform=android --profile=development
