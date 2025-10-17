@@ -1,0 +1,47 @@
+{
+  "cli": {
+    "version": ">= 3.13.2"
+  },
+  "build": {
+    "development-simulator": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FEEDBACK_FORM_URL" : "https://forms.gle/HUW4E6iGY6UG4m4g7"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BRANCH": "DEV"
+      }
+    },
+    "preview": {
+      "env": {
+        "EXPO_PUBLIC_BRANCH": "PREVIEW"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal"
+    },
+    "ui-test": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal"
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_BRANCH": "PROD"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

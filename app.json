@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Rescue",
+    "slug": "rescue",
+    "version": "1.1.2",
+    "orientation": "portrait",
+    "icon": "./assets/app-icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "buildNumber": "14",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anxietyapporg.anxietyapp"
+    },
+    "android": {
+      "versionCode": 22,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.anxietyapporg.anxietyapp"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eb290962-52f0-4bd8-b0b1-4d929a3bc2e1"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34
+          }
+        }
+      ]
+    ]
+  }
+}
